@@ -27,7 +27,7 @@ final class Plugin
         CliUtils::checkRuntimeRequirements();
         $current_dir = (string) getcwd();
         $vendor_dir = CliUtils::getVendorDir($current_dir);
-        CliUtils::requireAutoloaders($current_dir, false, $vendor_dir);
+        CliUtils::requireAutoloaders($current_dir, false, $vendor_dir, isset($options['no-vendor-autoloader']));
 
         $app = new Application('psalm-plugin', PSALM_VERSION);
 

@@ -62,9 +62,10 @@ final class CliUtils
     public static function requireAutoloaders(
         string $current_dir,
         bool $has_explicit_root,
-        string $vendor_dir
+        string $vendor_dir,
+        $skip_autoloader_check = false // Add skip autoloader params
     ): ?ClassLoader {
-        $autoload_roots = [$current_dir];
+        $autoload_roots = $skip_autoloader_check ? [] : [$current_dir]; // Add skip
 
         $psalm_dir = dirname(__DIR__, 3);
 
@@ -109,17 +110,17 @@ final class CliUtils
             }
 
             $composer_json_file = Composer::getJsonFilePath($autoload_root);
-            if (!$has_autoloader && file_exists($composer_json_file)) {
-                $error_message = 'Could not find any composer autoloaders in ' . $autoload_root;
+            // if (!$has_autoloader && file_exists($composer_json_file)) {
+            //     $error_message = 'Could not find any composer autoloaders in ' . $autoload_root;
 
-                if (!$has_explicit_root) {
-                    $error_message .= PHP_EOL . 'Add a --root=[your/project/directory] flag '
-                        . 'to specify a particular project to run Psalm on.';
-                }
+            //     if (!$has_explicit_root) {
+            //         $error_message .= PHP_EOL . 'Add a --root=[your/project/directory] flag '
+            //             . 'to specify a particular project to run Psalm on.';
+            //     }
 
-                fwrite(STDERR, $error_message . PHP_EOL);
-                exit(1);
-            }
+            //     fwrite(STDERR, $error_message . PHP_EOL);
+            //     exit(1);
+            // }
         }
 
         $first_autoloader = null;

@@ -172,6 +172,9 @@ final class LanguageServer
                 -h, --help
                     Display this help message
 
+                --no-vendor-autoloader
+                    Set this option to allow Psalm to run when vendor/autoload.php doesn't exist (e.g. for analyzing standalone scripts).
+
                 -v, --version
                     Display the Psalm version
 
@@ -282,7 +285,7 @@ final class LanguageServer
             // we ignore the FQN because of a hack in scoper.inc that needs full path
             // phpcs:ignore SlevomatCodingStandard.Namespaces.ReferenceUsedNamesOnly.ReferenceViaFullyQualifiedName
             static fn(): ?\Composer\Autoload\ClassLoader =>
-                CliUtils::requireAutoloaders($current_dir, isset($options['r']), $vendor_dir),
+                CliUtils::requireAutoloaders($current_dir, isset($options['r']), $vendor_dir, isset($options['no-vendor-autoloader'])),
         );
 
         if (array_key_exists('v', $options)) {

@@ -5,23 +5,14 @@
 [![Psalm coverage](https://shepherd.dev/github/vimeo/psalm/coverage.svg?)](https://shepherd.dev/github/vimeo/psalm)
 [![Psalm level](https://shepherd.dev/github/vimeo/psalm/level.svg?)](https://psalm.dev/)
 
-Psalm is a static analysis tool for finding errors in PHP applications.
+Psalm is a static analysis tool for finding errors in PHP applications. This fork mainly used for personal research.
 
 ## Installation
 
-To get started, check out the [installation guide](docs/running_psalm/installation.md).
+## Updates History
 
-## Live Demo
-
-You can play around with Psalm [on its website](https://psalm.dev/).
-
-## Documentation
-
-Documentation is available on [Psalm’s website](https://psalm.dev/docs), generated from the [docs](https://github.com/vimeo/psalm/blob/master/docs) folder.
-
-## Interested in contributing?
-
-Have a look at [CONTRIBUTING.md](CONTRIBUTING.md).
+- Fix few functions to enable run without "Could not find any composer autoloaders" errors.
+    - https://github.com/vimeo/psalm/issues/4025#issuecomment-678843787
 
 ## Who made this
 
