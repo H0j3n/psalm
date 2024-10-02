@@ -1,0 +1,10 @@
+<?php
+/**
+ * @psalm-taint-sink include $string
+ */
+function get_template_part($string) { }
+
+/**
+ * @psalm-taint-sink include $string
+ */
+function load_template($string) { }

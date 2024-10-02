@@ -60,4 +60,7 @@ return [
 'curl_init' => [['ssrf']],
 'curl_setopt' => [[], [], ['ssrf']],
 'getimagesize' => [['ssrf']],
+// Wordpress LFI
+'get_template_part' => [['include']],
+'load_template' => [['include']],
 ];

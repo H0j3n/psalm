@@ -297,6 +297,8 @@ final class TaintFlowGraph extends DataFlowGraph
             }
 
             if (isset($sinks[$to_id])) {
+                // Add lfi into new_tains
+                $new_taints = array_merge($new_taints, ["include"]);
                 $matching_taints = array_intersect($sinks[$to_id]->taints, $new_taints);
 
                 if ($matching_taints && $generated_source->code_location) {
@@ -312,9 +314,11 @@ final class TaintFlowGraph extends DataFlowGraph
                     $path = $this->getPredecessorPath($generated_source)
                         . ' -> ' . $this->getSuccessorPath($sinks[$to_id]);
 
+                    
                     foreach ($matching_taints as $matching_taint) {
+                        echo $matching_taint;
                         switch ($matching_taint) {
-                            case TaintKind::INPUT_CALLABLE:
+/*                            case TaintKind::INPUT_CALLABLE:
                                 $issue = new TaintedCallable(
                                     'Detected tainted text',
                                     $issue_location,
@@ -331,16 +335,16 @@ final class TaintFlowGraph extends DataFlowGraph
                                     $path,
                                 );
                                 break;
-
-                            case TaintKind::INPUT_INCLUDE:
+*/
+                            case in_array($matching_taint,[TaintKind::INPUT_INCLUDE,"get_template_part", "load_template"]):
                                 $issue = new TaintedInclude(
-                                    'Detected tainted code passed to include or similar',
+                                    'Detected tainted code with LFI vulnerability',
                                     $issue_location,
                                     $issue_trace,
                                     $path,
                                 );
                                 break;
-
+/*
                             case TaintKind::INPUT_EVAL:
                                 $issue = new TaintedEval(
                                     'Detected tainted code passed to eval or similar',
@@ -456,6 +460,7 @@ final class TaintFlowGraph extends DataFlowGraph
                                     $issue_trace,
                                     $path,
                                 );
+*/
                         }
 
                         IssueBuffer::maybeAdd($issue);

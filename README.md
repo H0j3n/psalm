@@ -11,7 +11,7 @@ Psalm is a static analysis tool for finding errors in PHP applications. This for
 
 - Run `git clone https://github.com/H0j3n/psalm.git`
 - Run `composer install` in Psalm directory
-- Run `./psalm init` in Psalm directory
+- Run `./psalm --init` in Psalm directory
 - Run `./psalm --taint-analysis <FOLDER>` in Psalm directory
 
 ## Updates History
@@ -19,6 +19,8 @@ Psalm is a static analysis tool for finding errors in PHP applications. This for
 - Fix few functions to enable run without "Could not find any composer autoloaders" errors.
     - https://github.com/vimeo/psalm/issues/4025#issuecomment-678843787
     - Commit: https://github.com/H0j3n/psalm/commit/eda089c98b4614b9104bb53520e53f498bb394b3
+- Focus on LFI issue within PHP + Wordpress (dev)
+    - Commit: 
 
 ## Who made this
 

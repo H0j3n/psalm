@@ -1064,7 +1064,7 @@ final class ProjectAnalyzer
             $this->codebase->find_unused_code === 'always',
         );
 
-        if ($this->stdout_report_options
+        /*if ($this->stdout_report_options
             && in_array(
                 $this->stdout_report_options->format,
                 [Report::TYPE_CONSOLE, Report::TYPE_PHP_STORM],
@@ -1077,7 +1077,7 @@ final class ProjectAnalyzer
                 . PHP_EOL . 'when analyzing individual files and folders. Run on the full project to enable'
                 . PHP_EOL . 'complete unused code detection.' . PHP_EOL,
             );
-        }
+        }*/
     }
 
     public function finish(float $start_time, string $psalm_version): void

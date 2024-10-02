@@ -2365,6 +2365,8 @@ class Config
             $stubsDir . 'CoreImmutableClasses.phpstub',
             $stubsDir . 'Reflection.phpstub',
             $stubsDir . 'SPL.phpstub',
+            // Adding Wordpress LFI 
+            $stubsDir . 'WordPressLFI.phpstub',
         ];
 
         if ($codebase->analysis_php_version_id >= 7_04_00) {
