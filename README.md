@@ -11,7 +11,7 @@ Psalm is a static analysis tool for finding errors in PHP applications. This for
 
 - Run `git clone https://github.com/H0j3n/psalm.git`
 - Run `composer install` in Psalm directory
-- Run `./psalm init` in Psalm directory
+- Run `./psalm --init` in Psalm directory
 - Run `./psalm --taint-analysis <FOLDER>` in Psalm directory
 
 ## Updates History
