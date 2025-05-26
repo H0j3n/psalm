@@ -15,6 +15,11 @@
         </ignoreFiles>
     </projectFiles>
     
+    <stubs>
+        <file name="stubs/WordPressLFI.phpstub" />
+        <file name="stubs/WordPress.phpstub" />
+    </stubs>
+    
     <taintAnalysis>
         <ignoreFiles>
             <directory name="vendor" />

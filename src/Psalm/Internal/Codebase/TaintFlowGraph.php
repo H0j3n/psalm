@@ -320,14 +320,9 @@ final class TaintFlowGraph extends DataFlowGraph
 
                     
                     foreach ($matching_taints as $matching_taint) {
-                        // Only log LFI vulnerabilities
-                        if ($matching_taint === TaintKind::INPUT_INCLUDE) {
-                            error_log("[PSALM] *** LFI VULNERABILITY DETECTED *** " . $generated_source->id . " -> " . $to_id);
-                        }
                         // Only report LFI issues - comment out other taint types
                         switch ($matching_taint) {
                             case TaintKind::INPUT_INCLUDE:
-                                error_log("[PSALM] LFI VULNERABILITY DETECTED! Path: " . $path);
                                 $issue = new TaintedInclude(
                                     'Detected tainted code with LFI vulnerability',
                                     $issue_location,

@@ -1,0 +1,44 @@
+<?php
+
+/**
+ * WordPress function stubs for testing
+ */
+
+/**
+ * @psalm-taint-source input
+ */
+function sanitize_text_field($str) { return $str; }
+
+function add_action($hook, $function_to_add, $priority = 10, $accepted_args = 1) { }
+
+function add_filter($hook, $function_to_add, $priority = 10, $accepted_args = 1) { }
+
+function remove_action($hook, $function_to_remove, $priority = 10) { }
+
+function remove_filter($hook, $function_to_remove, $priority = 10) { }
+
+function wp_die($message = '', $title = '', $args = array()) { }
+
+function wp_redirect($location, $status = 302, $x_redirect_by = 'WordPress') { }
+
+function add_query_arg($key, $value = null, $url = false) { }
+
+function show_admin_bar($show) { }
+
+/**
+ * Illuminate Agnostic Arr class stub
+ */
+namespace IlluminateAgnostic\Arr\Support {
+    class Arr {
+        /**
+         * @psalm-taint-source input
+         */
+        public static function get($array, $key, $default = null) {
+            return $default;
+        }
+        
+        public static function has($array, $key) {
+            return false;
+        }
+    }
+} 

@@ -8,3 +8,38 @@ function get_template_part($string) { }
  * @psalm-taint-sink include $string
  */
 function load_template($string) { }
+
+/**
+ * @psalm-taint-sink include $template
+ */
+function locate_template($template, $load = false, $require_once = true) { }
+
+/**
+ * @psalm-taint-sink include $template
+ */
+function get_template_directory() { }
+
+/**
+ * @psalm-taint-sink include $template
+ */
+function get_stylesheet_directory() { }
+
+/**
+ * @psalm-taint-sink include $file
+ */
+function include_once($file) { }
+
+/**
+ * @psalm-taint-sink include $file
+ */
+function require_once($file) { }
+
+/**
+ * @psalm-taint-sink include $file
+ */
+function include($file) { }
+
+/**
+ * @psalm-taint-sink include $file
+ */
+function require($file) { }

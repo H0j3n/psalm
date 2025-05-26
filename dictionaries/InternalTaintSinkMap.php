@@ -48,7 +48,7 @@ return [
 // 'curl_init' => [['ssrf']],
 // 'curl_setopt' => [[], [], ['ssrf']],
 // 'getimagesize' => [['ssrf']],
-// Wordpress LFI
+// WordPress LFI - Enhanced detection for CVE-2025-2294 and similar vulnerabilities
 'get_template_part' => [['include']],
 'load_template' => [['include']],
 // Extract function can lead to variable overwriting and LFI
