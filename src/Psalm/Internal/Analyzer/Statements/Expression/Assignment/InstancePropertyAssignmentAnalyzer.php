@@ -514,6 +514,7 @@ final class InstancePropertyAssignmentAnalyzer
 
                 if ($assignment_value_type->parent_nodes) {
                     foreach ($assignment_value_type->parent_nodes as $parent_node) {
+                        // error_log("[PSALM DEBUG] Property assignment: " . $parent_node->id . " -> " . $property_node->id . " (property: " . $property_id . ")");
                         $data_flow_graph->addPath($parent_node, $property_node, '=', $added_taints, $removed_taints);
                     }
                 }
@@ -608,6 +609,7 @@ final class InstancePropertyAssignmentAnalyzer
 
         if ($assignment_value_type->parent_nodes) {
             foreach ($assignment_value_type->parent_nodes as $parent_node) {
+                // error_log("[PSALM DEBUG] Unspecialized property assignment: " . $parent_node->id . " -> " . $localized_property_node->id . " (property: " . $property_id . ")");
                 $data_flow_graph->addPath(
                     $parent_node,
                     $localized_property_node,

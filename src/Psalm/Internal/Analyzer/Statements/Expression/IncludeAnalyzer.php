@@ -13,9 +13,12 @@ use Psalm\Internal\Analyzer\FileAnalyzer;
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\Codebase\TaintFlowGraph;
+use Psalm\Internal\DataFlow\DataFlowNode;
 use Psalm\Internal\DataFlow\TaintSink;
 use Psalm\Internal\Provider\NodeDataProvider;
 use Psalm\Issue\MissingFile;
+use Psalm\Issue\TaintedInclude;
+use Psalm\Issue\TaintedWordPressLFI;
 use Psalm\Issue\UnresolvableInclude;
 use Psalm\IssueBuffer;
 use Psalm\Plugin\EventHandler\Event\AddRemoveTaintsEvent;
@@ -50,6 +53,103 @@ use const PHP_EOL;
  */
 final class IncludeAnalyzer
 {
+    /**
+     * Cache to prevent duplicate vulnerability reports for the same location
+     * @var array<string, bool>
+     */
+    private static array $reported_vulnerabilities = [];
+    /**
+     * Simple check for HTTP sources in node IDs and labels
+     * @param DataFlowNode $node
+     * @return string|null HTTP source type if found
+     */
+    private static function getHttpSourceType(DataFlowNode $node): ?string
+    {
+        $id = $node->id;
+        $label = $node->label ?? '';
+        
+        if (strpos($id, '$_POST') !== false || strpos($label, '$_POST') !== false) {
+            return 'POST';
+        }
+        if (strpos($id, '$_GET') !== false || strpos($label, '$_GET') !== false) {
+            return 'GET';
+        }
+        if (strpos($id, '$_REQUEST') !== false || strpos($label, '$_REQUEST') !== false) {
+            return 'REQUEST';
+        }
+        if (strpos($id, '$_COOKIE') !== false || strpos($label, '$_COOKIE') !== false) {
+            return 'COOKIE';
+        }
+        
+        return null;
+    }
+
+    /**
+     * Recursively search for HTTP sources in the taint flow graph
+     * @param TaintFlowGraph $graph
+     * @param DataFlowNode $node
+     * @param int $depth
+     * @param array<string> $visited
+     * @return array<string> HTTP sources found
+     */
+    private static function findHttpSourcesRecursive(TaintFlowGraph $graph, DataFlowNode $node, int $depth = 0, array $visited = []): array
+    {
+        // Prevent infinite recursion and limit depth
+        if ($depth > 10 || isset($visited[$node->id])) {
+            return [];
+        }
+        
+        $visited[$node->id] = true;
+        $http_sources = [];
+        
+        // Check if this node is an HTTP source
+        $http_type = self::getHttpSourceType($node);
+        if ($http_type) {
+            $http_sources[] = $http_type . ': ' . $node->id;
+        }
+        
+        // Use reflection to access private properties
+        try {
+            $reflection = new \ReflectionClass($graph);
+            
+            // Check taint sources
+            $sourcesProperty = $reflection->getProperty('sources');
+            $sourcesProperty->setAccessible(true);
+            $sources = $sourcesProperty->getValue($graph);
+            
+            if (isset($sources[$node->id])) {
+                $source = $sources[$node->id];
+                $source_http_type = self::getHttpSourceType($source);
+                if ($source_http_type) {
+                    $http_sources[] = $source_http_type . ': ' . $source->id;
+                }
+            }
+            
+            // Get nodes and forward edges to traverse backwards
+            $nodesProperty = $reflection->getProperty('nodes');
+            $nodesProperty->setAccessible(true);
+            $nodes = $nodesProperty->getValue($graph);
+            
+            $forwardEdgesProperty = $reflection->getProperty('forward_edges');
+            $forwardEdgesProperty->setAccessible(true);
+            $forward_edges = $forwardEdgesProperty->getValue($graph);
+            
+            // Find nodes that point to this node (traverse backwards)
+            foreach ($forward_edges as $from_id => $edges) {
+                if (isset($edges[$node->id]) && isset($nodes[$from_id])) {
+                    $parent_node = $nodes[$from_id];
+                    $parent_sources = self::findHttpSourcesRecursive($graph, $parent_node, $depth + 1, $visited);
+                    $http_sources = array_merge($http_sources, $parent_sources);
+                }
+            }
+            
+        } catch (\ReflectionException $e) {
+            // If reflection fails, just check the current node
+        }
+        
+        return array_unique($http_sources);
+    }
+
     public static function analyze(
         StatementsAnalyzer $statements_analyzer,
         PhpParser\Node\Expr\Include_ $stmt,
@@ -107,41 +207,147 @@ final class IncludeAnalyzer
             );
         }
 
+        // Check for extract() + include() vulnerability pattern
+        // Any variable used in include() after extract() is potentially dangerous
+        if ($stmt->expr instanceof PhpParser\Node\Expr\Variable 
+            && is_string($stmt->expr->name)
+            && isset($context->vars_in_scope['__psalm_extract_vulnerability_detected'])
+        ) {
+            $arg_location = new CodeLocation($statements_analyzer->getSource(), $stmt->expr);
+            
+            // Get the source info if available
+            $source_info = 'user-controlled data';
+            if (isset($context->vars_in_scope['__psalm_extract_source_info'])) {
+                $source_type = $context->vars_in_scope['__psalm_extract_source_info'];
+                if ($source_type->isSingleStringLiteral()) {
+                    $source_info = $source_type->getSingleStringLiteral()->value;
+                }
+            }
+            
+            // Create a unique key for this vulnerability location to prevent duplicates
+            $extract_message = 'WordPress LFI Vulnerability: include() uses variable $' . $stmt->expr->name . ' that can be overwritten by extract() with ' . $source_info . '. The extract() function allows attackers to overwrite any variable, including $' . $stmt->expr->name . ', leading to Local File Inclusion';
+            $extract_vulnerability_key = $arg_location->file_name . ':' . $arg_location->getLineNumber() . ':' . $arg_location->getColumn() . ':' . md5($extract_message);
+            
+            // Only report if we haven't already reported this exact vulnerability
+            if (!isset(self::$reported_vulnerabilities[$extract_vulnerability_key])) {
+                self::$reported_vulnerabilities[$extract_vulnerability_key] = true;
+                
+                IssueBuffer::maybeAdd(
+                    new TaintedWordPressLFI(
+                        $extract_message,
+                        $arg_location,
+                        [],
+                        'extract(' . $source_info . ') -> $' . $stmt->expr->name . ' overwrite -> include($' . $stmt->expr->name . ')'
+                    ),
+                    $statements_analyzer->getSuppressedIssues()
+                );
+            }
+        }
+
         if ($stmt_expr_type
             && $statements_analyzer->data_flow_graph instanceof TaintFlowGraph
             && $stmt_expr_type->parent_nodes
             && !in_array('TaintedInput', $statements_analyzer->getSuppressedIssues())
         ) {
-            $arg_location = new CodeLocation($statements_analyzer->getSource(), $stmt->expr);
-
-            $include_param_sink = TaintSink::getForMethodArgument(
-                'include',
-                'include',
-                0,
-                $arg_location,
-                $arg_location,
-            );
-
-            $include_param_sink->taints = [TaintKind::INPUT_INCLUDE];
-
-            $statements_analyzer->data_flow_graph->addSink($include_param_sink);
-
-            $codebase = $statements_analyzer->getCodebase();
-            $event = new AddRemoveTaintsEvent($stmt, $context, $statements_analyzer, $codebase);
-
-            $added_taints = $codebase->config->eventDispatcher->dispatchAddTaints($event);
-            $removed_taints = $codebase->config->eventDispatcher->dispatchRemoveTaints($event);
-
+            // Check for both confirmed HTTP sources and WordPress-specific patterns
+            $confirmed_http_sources = [];
+            $wordpress_template_patterns = [];
+            $all_parent_info = [];
+            
             foreach ($stmt_expr_type->parent_nodes as $parent_node) {
-                $statements_analyzer->data_flow_graph->addPath(
-                    $parent_node,
-                    $include_param_sink,
-                    'arg',
-                    $added_taints,
-                    $removed_taints,
+                $all_parent_info[] = $parent_node->id;
+                
+                // Check for direct HTTP sources in this node
+                $direct_http_type = self::getHttpSourceType($parent_node);
+                if ($direct_http_type) {
+                    $confirmed_http_sources[] = $direct_http_type . ': ' . $parent_node->id;
+                }
+                
+                // Recursively search for HTTP sources in the taint flow graph
+                $traced_sources = self::findHttpSourcesRecursive($statements_analyzer->data_flow_graph, $parent_node);
+                $confirmed_http_sources = array_merge($confirmed_http_sources, $traced_sources);
+                
+                // Check for WordPress-specific template patterns (but exclude generic $this->template)
+                if (strpos($parent_node->id, '$template') !== false && 
+                    strpos($parent_node->id, '$this->template') === false) {
+                    // This looks like a WordPress $template variable (not $this->template)
+                    $wordpress_template_patterns[] = $parent_node->id;
+                }
+            }
+            
+            // Remove duplicates
+            $confirmed_http_sources = array_unique($confirmed_http_sources);
+            $wordpress_template_patterns = array_unique($wordpress_template_patterns);
+            
+            $arg_location = new CodeLocation($statements_analyzer->getSource(), $stmt->expr);
+            $parent_chain = implode(' -> ', array_slice($all_parent_info, 0, 3));
+            
+            // Report vulnerabilities (avoid duplicates by checking both conditions together)
+            $should_report = false;
+            $report_message = '';
+            $report_shortcode = '';
+            
+            if (!empty($confirmed_http_sources)) {
+                $source_info = implode(', ', $confirmed_http_sources);
+                $should_report = true;
+                
+                if (!empty($wordpress_template_patterns)) {
+                    $report_message = 'WordPress LFI Vulnerability: HTTP input (' . $source_info . ') flows to include() via $template - Chain: ' . $parent_chain;
+                } else {
+                    $report_message = 'LFI Vulnerability: HTTP input (' . $source_info . ') flows to include() - Chain: ' . $parent_chain;
+                }
+                $report_shortcode = $source_info . ' -> include()';
+                
+            } elseif (!empty($wordpress_template_patterns)) {
+                // WordPress template pattern without confirmed HTTP sources - still report as it's a known vulnerability pattern
+                $template_info = implode(', ', $wordpress_template_patterns);
+                $should_report = true;
+                $report_message = 'WordPress LFI Pattern: Include with $template variable (check for $_POST[\'template\'] input) - Chain: ' . $parent_chain;
+                $report_shortcode = $template_info . ' -> include()';
+            }
+            
+            // Only create one report and one taint sink per include statement
+            if ($should_report) {
+                // Create a unique key for this vulnerability location to prevent duplicates
+                $vulnerability_key = $arg_location->file_name . ':' . $arg_location->getLineNumber() . ':' . $arg_location->getColumn() . ':' . md5($report_message);
+                
+                // Only report if we haven't already reported this exact vulnerability
+                if (!isset(self::$reported_vulnerabilities[$vulnerability_key])) {
+                    self::$reported_vulnerabilities[$vulnerability_key] = true;
+                    
+                    IssueBuffer::maybeAdd(
+                        new TaintedInclude(
+                            $report_message,
+                            $arg_location,
+                            [],
+                            $report_shortcode
+                        ),
+                        $statements_analyzer->getSuppressedIssues()
+                    );
+                }
+                
+                // Create taint sink (only once)
+                $include_param_sink = TaintSink::getForMethodArgument(
+                    'include',
+                    'include',
+                    0,
+                    $arg_location,
+                    $arg_location,
                 );
+
+                $include_param_sink->taints = [TaintKind::INPUT_INCLUDE];
+                $statements_analyzer->data_flow_graph->addSink($include_param_sink);
+
+                foreach ($stmt_expr_type->parent_nodes as $parent_node) {
+                    $statements_analyzer->data_flow_graph->addPath(
+                        $parent_node,
+                        $include_param_sink,
+                        'arg',
+                    );
+                }
             }
         }
+
 
         if ($path_to_file) {
             $path_to_file = self::normalizeFilePath($path_to_file);
@@ -449,4 +655,6 @@ final class IncludeAnalyzer
 
         return $path_to_file;
     }
+
+
 }

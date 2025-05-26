@@ -14,4 +14,10 @@
             <directory name="vendor" />
         </ignoreFiles>
     </projectFiles>
+    
+    <taintAnalysis>
+        <ignoreFiles>
+            <directory name="vendor" />
+        </ignoreFiles>
+    </taintAnalysis>
 </psalm>

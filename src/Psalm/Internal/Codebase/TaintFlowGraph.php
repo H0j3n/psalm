@@ -17,6 +17,7 @@ use Psalm\Issue\TaintedHeader;
 use Psalm\Issue\TaintedHtml;
 use Psalm\Issue\TaintedInclude;
 use Psalm\Issue\TaintedLdap;
+use Psalm\Issue\TaintedWordPressLFI;
 use Psalm\Issue\TaintedSSRF;
 use Psalm\Issue\TaintedShell;
 use Psalm\Issue\TaintedSql;
@@ -197,10 +198,15 @@ final class TaintFlowGraph extends DataFlowGraph
 
     public function connectSinksAndSources(): void
     {
+        // Only log LFI vulnerabilities - no general taint analysis info
+        
         $visited_source_ids = [];
 
         $sources = $this->sources;
         $sinks = $this->sinks;
+
+        // Enhanced vulnerability detection
+        $this->detectPotentialVulnerabilities($sources, $sinks);
 
         ksort($this->specializations);
         ksort($this->forward_edges);
@@ -297,8 +303,6 @@ final class TaintFlowGraph extends DataFlowGraph
             }
 
             if (isset($sinks[$to_id])) {
-                // Add lfi into new_tains
-                $new_taints = array_merge($new_taints, ["include"]);
                 $matching_taints = array_intersect($sinks[$to_id]->taints, $new_taints);
 
                 if ($matching_taints && $generated_source->code_location) {
@@ -316,9 +320,26 @@ final class TaintFlowGraph extends DataFlowGraph
 
                     
                     foreach ($matching_taints as $matching_taint) {
-                        echo $matching_taint;
+                        // Only log LFI vulnerabilities
+                        if ($matching_taint === TaintKind::INPUT_INCLUDE) {
+                            error_log("[PSALM] *** LFI VULNERABILITY DETECTED *** " . $generated_source->id . " -> " . $to_id);
+                        }
+                        // Only report LFI issues - comment out other taint types
                         switch ($matching_taint) {
-/*                            case TaintKind::INPUT_CALLABLE:
+                            case TaintKind::INPUT_INCLUDE:
+                                error_log("[PSALM] LFI VULNERABILITY DETECTED! Path: " . $path);
+                                $issue = new TaintedInclude(
+                                    'Detected tainted code with LFI vulnerability',
+                                    $issue_location,
+                                    $issue_trace,
+                                    $path,
+                                );
+                                IssueBuffer::maybeAdd($issue);
+                                break;
+
+                            // Commented out other taint types to focus only on LFI detection
+                            /*
+                            case TaintKind::INPUT_CALLABLE:
                                 $issue = new TaintedCallable(
                                     'Detected tainted text',
                                     $issue_location,
@@ -335,16 +356,7 @@ final class TaintFlowGraph extends DataFlowGraph
                                     $path,
                                 );
                                 break;
-*/
-                            case in_array($matching_taint,[TaintKind::INPUT_INCLUDE,"get_template_part", "load_template"]):
-                                $issue = new TaintedInclude(
-                                    'Detected tainted code with LFI vulnerability',
-                                    $issue_location,
-                                    $issue_trace,
-                                    $path,
-                                );
-                                break;
-/*
+
                             case TaintKind::INPUT_EVAL:
                                 $issue = new TaintedEval(
                                     'Detected tainted code passed to eval or similar',
@@ -460,10 +472,8 @@ final class TaintFlowGraph extends DataFlowGraph
                                     $issue_trace,
                                     $path,
                                 );
-*/
+                            */
                         }
-
-                        IssueBuffer::maybeAdd($issue);
                     }
                 }
             }
@@ -533,5 +543,43 @@ final class TaintFlowGraph extends DataFlowGraph
     private function doesForwardEdgeExist(DataFlowNode $new_source): bool
     {
         return isset($this->forward_edges[$new_source->id]);
+    }
+
+    private function detectPotentialVulnerabilities(array &$sources, array &$sinks): void
+    {
+        // error_log("[PSALM DEBUG] Analyzing " . count($sources) . " sources and " . count($sinks) . " sinks for potential vulnerabilities");
+        
+        // Look for patterns where HTTP input sources could reach dangerous sinks
+        foreach ($sources as $source) {
+            // error_log("[PSALM DEBUG] Source: " . $source->id . " with taints: " . implode(', ', $source->taints));
+            
+            // Check if this is an HTTP input source
+            if (strpos($source->id, '$_POST') !== false || 
+                strpos($source->id, '$_GET') !== false || 
+                strpos($source->id, '$_REQUEST') !== false ||
+                strpos($source->id, '$_COOKIE') !== false) {
+                
+                // error_log("[PSALM DEBUG] HTTP input source found: " . $source->id);
+                
+                // Try to trace this source through the data flow graph
+                $this->traceSourceToSinks($source, $sinks);
+            }
+        }
+    }
+    
+    private function traceSourceToSinks(TaintSource $source, array $sinks): void
+    {
+        // error_log("[PSALM DEBUG] Tracing source " . $source->id . " to potential sinks");
+        
+        // This is a simplified trace - in practice, we'd need to follow the full data flow graph
+        foreach ($sinks as $sink) {
+            if (in_array(TaintKind::INPUT_INCLUDE, $sink->taints)) {
+                // error_log("[PSALM DEBUG] Found include sink: " . $sink->id . " at " . ($sink->code_location ? $sink->code_location->getShortSummary() : 'unknown location'));
+                
+                // For now, just log the potential connection
+                // In a full implementation, we'd check if there's a path from source to sink
+                //error_log("[PSALM DEBUG] Potential vulnerability path: " . $source->id . " -> " . $sink->id);
+            }
+        }
     }
 }

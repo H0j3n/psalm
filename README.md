@@ -21,6 +21,7 @@ Psalm is a static analysis tool for finding errors in PHP applications. This for
     - Commit: https://github.com/H0j3n/psalm/commit/eda089c98b4614b9104bb53520e53f498bb394b3
 - Focus on LFI issue within PHP + Wordpress (dev)
     - Commit: https://github.com/H0j3n/psalm/commit/1a95fc09855ad489bbf365857b90c19af01383e3
+- Fix some error in "src/Psalm/Internal/Codebase/TaintFlowGraph.php"
 
 ## Who made this
 

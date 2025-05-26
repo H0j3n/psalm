@@ -14,3 +14,6 @@
 .idea/
 .vscode/
 .php-version
+/Test-File/
+*.zip
+test*.php

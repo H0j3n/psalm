@@ -11,6 +11,7 @@ use Psalm\Internal\Algebra\FormulaGenerator;
 use Psalm\Internal\Analyzer\AlgebraAnalyzer;
 use Psalm\Internal\Analyzer\FunctionLikeAnalyzer;
 use Psalm\Internal\Analyzer\Statements\Expression\CallAnalyzer;
+use Psalm\Internal\Analyzer\Statements\Expression\ExtractAnalyzer;
 use Psalm\Internal\Analyzer\Statements\ExpressionAnalyzer;
 use Psalm\Internal\Analyzer\StatementsAnalyzer;
 use Psalm\Internal\Analyzer\TraitAnalyzer;
@@ -273,6 +274,10 @@ final class FunctionCallAnalyzer extends CallAnalyzer
 
             $config->eventDispatcher->dispatchAfterEveryFunctionCallAnalysis($event);
 
+
+
+
+
             if ($is_first_class_callable) {
                 return true;
             }
@@ -414,6 +419,11 @@ final class FunctionCallAnalyzer extends CallAnalyzer
                 strtolower($function_call_info->function_id),
                 $context,
             );
+        }
+
+        // Check for extract() function calls that could lead to LFI vulnerabilities
+        if ($function_name instanceof PhpParser\Node\Name) {
+            ExtractAnalyzer::analyze($statements_analyzer, $stmt, $context);
         }
 
         if (!$statements_analyzer->node_data->getType($real_stmt)) {
@@ -1154,4 +1164,6 @@ final class FunctionCallAnalyzer extends CallAnalyzer
 
         return false;
     }
+
+
 }

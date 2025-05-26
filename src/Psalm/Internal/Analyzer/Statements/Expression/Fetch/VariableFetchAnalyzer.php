@@ -515,6 +515,7 @@ final class VariableFetchAnalyzer
                 || $var_name === '$_COOKIE'
                 || $var_name === '$_REQUEST'
             ) {
+                // error_log("[PSALM DEBUG] Taint source detected: " . $var_name);
                 $taint_location = new CodeLocation($statements_analyzer->getSource(), $stmt);
 
                 $server_taint_source = new TaintSource(
@@ -526,6 +527,7 @@ final class VariableFetchAnalyzer
                 );
 
                 $statements_analyzer->data_flow_graph->addSource($server_taint_source);
+                // error_log("[PSALM DEBUG] Created taint source " . $server_taint_source->id . " at " . $taint_location->getShortSummary());
 
                 $type = $type->setParentNodes([
                     $server_taint_source->id => $server_taint_source,
